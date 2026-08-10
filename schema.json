@@ -1,6 +1,8 @@
 {
 	"$defs": {
-		"timestamp": {"type": "string"}
+		"timestamp": {"type": "string"},
+		"action": {"type": "string", "enum": ["linking", "unlinked", "failed"]},
+		"reason": {"type": "string", "enum": ["unverified", "no_reply", "socket", "read_error", "write_error"]}
 	},
 
 	"status": {
@@ -8,6 +10,14 @@
 		"timestamp": {"$ref": "#/$defs/timestamp"},
 		"message": {"type": "string"},
 		"required": ["timestamp", "message"]
+	},
+
+	"link": {
+		"type": "object",
+		"timestamp": {"$ref": "#/$defs/timestamp"},
+		"action": {"$ref": "#/$defs/action"},
+		"reason": {"$ref": "#/$defs/reason"},
+		"required": ["timestamp", "action"]
 	}
 }
 

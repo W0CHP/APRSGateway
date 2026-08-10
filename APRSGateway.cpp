@@ -262,7 +262,7 @@ void CAPRSGateway::writeJSONStatus(const std::string& status)
 	json["timestamp"] = CUtils::createTimestamp();
 	json["message"]   = status;
 
-	WriteJSON("status", json);
+	WriteJSON("status", json, false);
 }
 
 void CAPRSGateway::writeAPRS(const std::string& message)

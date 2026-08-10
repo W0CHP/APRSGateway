@@ -35,6 +35,17 @@ extern void Log(unsigned int level, const char* fmt, ...);
 extern void LogInitialise(unsigned int displayLevel, unsigned int mqttLevel);
 extern void LogFinalise();
 
-extern void WriteJSON(const std::string& topLevel, nlohmann::json& json);
+extern void WriteJSON(const std::string& topLevel, nlohmann::json& json, bool retain);
+
+// Structured link-state event, mirroring the "link" Kind DMRGateway/
+// YSFGateway/DStarGateway already publish -- APRSGateway never had one
+// before (only a bare start/stop "status" string). action is one of
+// "linking"/"unlinked"/"failed"; reason is only meaningful for "failed"
+// (see APRSWriterThread.cpp for the actual values) and can be left empty
+// otherwise. A free function, not a CAPRSGateway member, because
+// CAPRSWriterThread -- a separate class that owns the actual APRS-IS
+// socket -- is what needs to call this directly, the same reasoning
+// DStarGateway's writeJSONLinking/Unlinked/Failed already established.
+extern void writeJSONLink(const std::string& action, const std::string& reason);
 
 #endif
