@@ -112,6 +112,7 @@ void CAPRSWriterThread::entry()
 						m_connected = false;
 						m_socket.close();
 						LogError("Connection to the APRS thread has failed");
+						writeJSONLink("failed", "write_error");
 						startReconnectionTimer();
 					}
 				}
@@ -124,6 +125,7 @@ void CAPRSWriterThread::entry()
 						m_connected = false;
 						m_socket.close();
 						LogError("Error when reading from the APRS server");
+						writeJSONLink("failed", "read_error");
 						startReconnectionTimer();
 					}
 
@@ -136,8 +138,10 @@ void CAPRSWriterThread::entry()
 			}
 		}
 
-		if (m_connected)
+		if (m_connected) {
 			m_socket.close();
+			writeJSONLink("unlinked", "");
+		}
 
 		while (!m_queue.isEmpty()) {
 			unsigned char p;
@@ -197,8 +201,10 @@ void CAPRSWriterThread::clock(unsigned int ms)
 bool CAPRSWriterThread::connect()
 {
 	bool ret = m_socket.open();
-	if (!ret)
+	if (!ret) {
+		writeJSONLink("failed", "socket");
 		return false;
+	}
 
 	//wait for lgin banner
 	int length;
@@ -207,11 +213,13 @@ bool CAPRSWriterThread::connect()
 	if (length == 0) {
 		LogError("No reply from the APRS server after %u seconds", APRS_TIMEOUT);
 		m_socket.close();
+		writeJSONLink("failed", "no_reply");
 		return false;
 	}
 	if (length < 0) {
 		LogError("Error when reading from the APRS server");
 		m_socket.close();
+		writeJSONLink("failed", "read_error");
 		return false;
 	}
 
@@ -223,6 +231,7 @@ bool CAPRSWriterThread::connect()
 	ret = m_socket.writeLine(std::string(connectString));
 	if (!ret) {
 		m_socket.close();
+		writeJSONLink("failed", "write_error");
 		return false;
 	}
 
@@ -230,15 +239,34 @@ bool CAPRSWriterThread::connect()
 	if (length == 0) {
 		LogError("No reply from the APRS server after %u seconds", APRS_TIMEOUT);
 		m_socket.close();
+		writeJSONLink("failed", "no_reply");
 		return false;
 	}
 	if (length < 0) {
 		LogError("Error when reading from the APRS server");
 		m_socket.close();
+		writeJSONLink("failed", "read_error");
 		return false;
 	}
 
 	LogMessage("Response from APRS server: %s", CUtils::rtrim(serverResponse).c_str());
+
+	// APRS-IS's login response is a line like
+	// "# logresp CALLSIGN verified, server NAME" (or "unverified" if the
+	// passcode doesn't match the callsign). The socket is genuinely open
+	// either way -- an unverified login still completes the TCP/login
+	// round-trip -- but an unverified feed may be silently dropped or
+	// filtered server-side, so this is exactly the "wrong password"
+	// equivalent for APRS-IS and deserves its own visible reason rather
+	// than being indistinguishable from a fully working connection, which
+	// is what happened before this patch (the response was read and
+	// logged, never inspected).
+	if (serverResponse.find("unverified") != std::string::npos) {
+		LogWarning("APRS-IS login was not verified -- check the configured passcode");
+		writeJSONLink("failed", "unverified");
+	} else {
+		writeJSONLink("linking", "");
+	}
 
 	LogMessage("Connected to the APRS server");
 
